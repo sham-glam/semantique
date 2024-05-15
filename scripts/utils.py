@@ -1,11 +1,9 @@
 # utils
 
-import numpy as np
-import json
-import glob
 from pprint import pprint
-from collections import defaultdict
+from collections import defaultdict, Counter
 import os, math, subprocess
+from itertools import chain
 
 import gensim
 import gensim.corpora as corpora
@@ -22,50 +20,21 @@ import BnLemma as lm
 from bnlp import BengaliPOS
 import regex
 
+
 # global variables
 bn_pos = BengaliPOS()
 from bnlp import BengaliCorpus as corpus
 stopwords = corpus.stopwords[:20] + ['রি' + 'টি']
 
-
-
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-
-def read_corpus(corpus, num_lines=1000):
-    data = open(corpus, 'r')
-    lines = data.readlines(num_lines) # lecture par ligne
-    lines = [line for line in lines if not line.startswith('Image') and len(line)>0]
-    # print(lines[:10])
-    docs = [line.split() for line in lines]
-    docs[:10]
-    filtered_docs = filter_doc(docs)
-
-    return filtered_docs
-
-
-
-def lemmatize_bangla(text):
-    if text is not None:
-        lemma = lm.Lemmatizer()
-        try:
-            lemmatized = lemma.lemma(text)
-            # print(lemmatized)
-            return lemmatized.split()
-        except Exception as e:
-            # print(f"Error in lemmatizing text: {e}")
-            return None
 
 
 
 def filter_doc(texts):  
     filtered = []
     for line in texts:
-            # print(line)
-            
-            # print(line)
-            filtered_line = [token for token in line if bn_pos.tag(token)[0][1] in ['NC','NP', 'JQ', 'JJ']] # 'NST',, 'AMN', , 'NCgen'
+            filtered_line = [token for token in line if bn_pos.tag(token)[0][1] in ['NC','NP']] # 'NST',, 'AMN', , 'NCgen'
             filtered_line = [token for token in filtered_line if token not in stopwords and len(token)>2]
             line = ' '.join(filtered_line)
             line = regex.sub(r'(ডিসেম্বর|নভেম্বর|অক্টোবর|সেপ্টেম্বর|আগস্ট|জুলাই|জুন|মে|অপ্রিল|মার্চ|ফেব্রুয়ারী|জানুয়ারী)', '', line)
@@ -80,31 +49,31 @@ def filter_doc(texts):
 
 
 
-# def make_bigrams(texts):
-#     # print(bigram[doc] for doc in texts)
-#     return ([bigram[doc] for doc in texts])
+# lecture des fichiers txt , aka corpus
+def read_corpus(corpus, num_lines=1000):
+    data = open(corpus, 'r')
+    lines = data.readlines(num_lines) # lecture par ligne
+    lines = [line for line in lines if not line.startswith('Image') and len(line)>0]
+    docs = [line.split() for line in lines]
+    filtered_docs = filter_doc(docs)
 
-# def make_trigrams(texts):
-#     return([trigram[bigram[doc]] for doc in texts])
-
-def make_bigrams_trigrams(texts):
-
-    bigram_phrases = gensim.models.Phrases(texts, min_count=5, threshold=50)
-    trigram_phrases = gensim.models.Phrases(bigram_phrases[texts], threshold=50)
-    bigram = gensim.models.phrases.Phraser(bigram_phrases)
-    trigram = gensim.models.phrases.Phraser(trigram_phrases)
-    data_bigrams = [bigram[doc] for doc in texts] #make_bigrams(list_of_docs)
-    data_bigrams_trigrams =  [trigram[bigram[doc]] for doc in data_bigrams]#make_trigrams(data_bigrams)
-
-    return data_bigrams_trigrams
+    return filtered_docs
 
 
-def get_corpus(texts, data_bigrams_trigrams):
 
-    id2word = Dictionary(texts)
-    corpus = [id2word.doc2bow(text) for text in texts]
+def lemmatize_bangla(text):
+    if text is not None:
+        lemma = lm.Lemmatizer()
+        try:
+            lemmatized = lemma.lemma(text)
+            return lemmatized.split()
+        except Exception as e:
+            return None
 
 
+
+
+def get_corpus(corpus, id2word):
 
     tfidf = TfidfModel(corpus, id2word=id2word)
     low_value = 0.03
@@ -114,7 +83,7 @@ def get_corpus(texts, data_bigrams_trigrams):
     # enlève les termes trops fréquents
     for i in range(0, len(corpus)):
         bow = corpus[i]
-        low_value_words = [] #reinitialize to be safe. You can skip this.
+        low_value_words = [] 
         tfidf_ids = [id for id, value in tfidf[bow]]
         bow_ids = [id for id, value in bow]
         low_value_words = [id for id, value in tfidf[bow] if value < low_value]
@@ -127,7 +96,10 @@ def get_corpus(texts, data_bigrams_trigrams):
         corpus[i] = new_bow
 
         return corpus
-###
+
+
+
+### Partie II - calcul de spécificité ###
 
 def is_float(string):
     try:
@@ -141,7 +113,8 @@ def calculate_frequency(texts):
     frequency = defaultdict(int)    
     for text in texts:
         for token in text:
-            if bn_pos.tag(token)[0][1] in ['NC','NP', 'JQ', 'JJ'] :
+            if bn_pos.tag(token)[0][1] in ['NC','NP'] :
+                # if token not in frequency.keys():
                 frequency[token] +=1
                 
     return dict(frequency)
@@ -168,6 +141,8 @@ def specif(f, F, t, T):
     except subprocess.CalledProcessError as e:
             print(f" {e}.\nErreur en calculant la spécificité  pour : <{f}>, <{F}>, <{t}>, <{T}>")
             return None
+
+
     
 
 ## calcule f F t T -> appelle specif ##
@@ -191,4 +166,17 @@ def process_specif(focus_freq, window_freq, path):
                     file.write(f'{key}\t{specificite}\n')
         
     return spec_dict      
+
+
+# get_higest_lowest_specificity
+def get_higest_lowest_specificity(filtered_docs, num=20):
+    focus_ratio = 1/3
+    split_index = int(len(filtered_docs) * focus_ratio)
+    focus_dict = calculate_frequency(filtered_docs[:split_index])
+    window_dict= calculate_frequency(filtered_docs[split_index:])
+    specificite = process_specif(focus_dict, window_dict, path="cache/") # dict specificite
+    max_values = dict(sorted(specificite.items(), key=lambda item: -item[1])[:num])
+    min_values = dict(sorted(specificite.items(), key=lambda item: item[1])[:num])
+
+    return max_values, min_values
 
