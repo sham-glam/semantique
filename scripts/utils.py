@@ -2,7 +2,7 @@
 
 from pprint import pprint
 from collections import defaultdict, Counter
-import os, math, subprocess
+import os, math, subprocess, random
 from itertools import chain
 
 import gensim
@@ -37,7 +37,7 @@ def filter_doc(texts):
             filtered_line = [token for token in line if bn_pos.tag(token)[0][1] in ['NC','NP']] # 'NST',, 'AMN', , 'NCgen'
             filtered_line = [token for token in filtered_line if token not in stopwords and len(token)>2]
             line = ' '.join(filtered_line)
-            line = regex.sub(r'(ডিসেম্বর|নভেম্বর|অক্টোবর|সেপ্টেম্বর|আগস্ট|জুলাই|জুন|মে|অপ্রিল|মার্চ|ফেব্রুয়ারী|জানুয়ারী)', '', line)
+            line = regex.sub(r'(শুক্রবার|শনিবার|রবিবার|সোমবার|মঙ্গলবার|বুধবার|বৃহস্পতিবার)', '', line)
             line = regex.sub(r'(১২৩৪৫৬৭৮৯০)', '', line)
             line = regex.sub(r'(জানুয়ারী|ফেব্রুয়ারী|মার্চ|এপ্রিল|মে|জুন|জুলাই|আগস্ট|সেপ্টেম্বর|অক্টোবর|নভেম্বর|ডিসেম্বর)', '', line)
             line = lemmatize_bangla(line)
@@ -50,10 +50,22 @@ def filter_doc(texts):
 
 
 # lecture des fichiers txt , aka corpus
+# def read_corpus(corpus, num_lines=1000):
+#     data = open(corpus, 'r')
+#     lines = data.readlines(num_lines) # lecture par ligne
+#     lines = [line for line in lines if not line.startswith('Image') and len(line)>0]
+#     docs = [line.split() for line in lines]
+#     filtered_docs = filter_doc(docs)
+
+#     return filtered_docs
+
 def read_corpus(corpus, num_lines=1000):
+    random.seed(42)
     data = open(corpus, 'r')
-    lines = data.readlines(num_lines) # lecture par ligne
+    lines = data.readlines()  # lecture de toutes les lignes
     lines = [line for line in lines if not line.startswith('Image') and len(line)>0]
+    random.shuffle(lines)  # mélange des lignes
+    lines = lines[:num_lines]  # sélectionne les num_lines premières lignes
     docs = [line.split() for line in lines]
     filtered_docs = filter_doc(docs)
 
@@ -95,7 +107,7 @@ def get_corpus(corpus, id2word):
         new_bow = [b for b in bow if b[0] not in low_value_words and b[0] not in words_missing_in_tfidf]
         corpus[i] = new_bow
 
-        return corpus
+    return corpus
 
 
 
