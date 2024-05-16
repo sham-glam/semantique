@@ -3,7 +3,7 @@
 from pprint import pprint
 from collections import defaultdict, Counter
 import os, math, subprocess, random
-from itertools import chain
+# from itertools import chain
 
 import gensim
 import gensim.corpora as corpora
@@ -48,16 +48,6 @@ def filter_doc(texts):
     return filtered
 
 
-
-# lecture des fichiers txt , aka corpus
-# def read_corpus(corpus, num_lines=1000):
-#     data = open(corpus, 'r')
-#     lines = data.readlines(num_lines) # lecture par ligne
-#     lines = [line for line in lines if not line.startswith('Image') and len(line)>0]
-#     docs = [line.split() for line in lines]
-#     filtered_docs = filter_doc(docs)
-
-#     return filtered_docs
 
 def read_corpus(corpus, num_lines=1000):
     random.seed(42)
